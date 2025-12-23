@@ -162,8 +162,9 @@ class GO2TorqueCfg(GO2RoughCfg):
         max_freq = 200
         start_freq = 100
 
-        k = 0.00003
-        x0 = 1000 * 24
+        k = 0.00005
+        x0 = 1000 * 12
+        ema_alpha = 0.1  # EMA smoothing factor for tracking error
 
     class test:
         use_test = False

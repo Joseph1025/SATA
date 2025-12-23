@@ -1,3 +1,6 @@
+from audioop import lin2adpcm
+
+from sympy import total_degree
 from legged_gym.envs import LeggedRobot
 from legged_gym.envs.go2.go2_torque.go2_torque_config import GO2TorqueCfg, GO2TorqueCfgPPO
 from legged_gym.utils.math import wrap_to_pi
@@ -51,6 +54,9 @@ class GO2Torque(LeggedRobot):
         self.current_dt = 0
         self.current_freq = self.start_freq
         self.low_torque = 0
+        self.recent_error = 0.0
+        self.ema_alpha = 0.1
+        self.residual = 0.0  # Adaptive residual for growth scale
 
         super().__init__(cfg, sim_params, physics_engine, sim_device, headless)
         self.motor_fatigue = torch.zeros(cfg.env.num_envs, self.num_dofs, device=sim_device)
@@ -174,13 +180,50 @@ class GO2Torque(LeggedRobot):
                                                      gymtorch.unwrap_tensor(self.root_states),
                                                      gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
 
+    def compute_tracking_error(self):
+        lin_vel_error = torch.sum(torch.square(self.commands[:, :2] - self.base_lin_vel[:, :2]), dim=1)
+        ang_vel_error = torch.square(self.commands[:, 2] - self.base_ang_vel[:, 2])
+        
+        total_error = lin_vel_error + ang_vel_error
+        current_mean_error = torch.mean(total_error).item()
+        return current_mean_error
+    
+    def get_recent_tracking_error(self):
+        curr_error = self.compute_tracking_error()
+        # Apply EMA
+        self.recent_error = self.cfg.growth.ema_alpha * curr_error + (1.0 - self.cfg.growth.ema_alpha) * self.recent_error
+        return self.recent_error
+    
     def _update_growth_scale(self):
         self.step_count += 1
         if self.cfg.control.control_type == "T" or self.cfg.test.use_test:
             self.step_count = GO2TorqueCfgPPO().runner.num_steps_per_env * self.cfg.test.checkpoint
 
-        # follow Gompertz curve
+        # original Gompertz: 
         self.general_scale = np.exp(-np.exp((-self.cfg.growth.k * (self.step_count - self.cfg.growth.x0))))
+        
+        # Disabled - full scale from start:
+        # self.general_scale = 1.0
+        
+        # Linear: 
+        # self.general_scale = np.clip(self.step_count / (2 * self.cfg.growth.x0), 0.0, 1.0)
+        
+        # reversed Gompertz: 
+        # self.general_scale = 1 / (1 + np.exp(-self.cfg.growth.k * (self.step_count - self.cfg.growth.x0)))
+        
+        # step growth: scale from 0.1 to 1.0 over 3000 steps
+        # G = np.linspace(0.1, 1.0, 10)[np.searchsorted(np.arange(300, 3000, 300), self.step_count)]
+        # self.general_scale = np.clip(G, 0.0, 1.0)
+        
+        # Adaptive Residual:
+        # g_base = min(self.step_count / self.cfg.growth.x0, 1.0)
+        # avg_velocity_error = self.get_recent_tracking_error()
+        # if avg_velocity_error < 0.1: # Doing great!
+        #     self.residual += 0.001
+        # elif avg_velocity_error > 0.5: # Struggling!
+        #     self.residual -= 0.002
+        # self.residual = np.clip(self.residual, -0.1, 0.1)
+        # self.general_scale = np.clip(g_base + self.residual, 0.0, 1.0)
 
         self.current_freq = self.general_scale * (self.max_freq - self.start_freq) + self.start_freq
         self.current_torque_limit_scale = self.general_scale * (

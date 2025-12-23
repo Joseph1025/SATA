@@ -54,7 +54,7 @@ def play(args):
     env_cfg.control.motor_fatigue = True
     env_cfg.commands.heading_command = True
 
-    env_cfg.terrain.mesh_type = 'plane'  # 'trimesh'
+    env_cfg.terrain.mesh_type = 'trimesh'  # 'trimesh'
     env_cfg.terrain.num_rows = 5
     env_cfg.terrain.num_cols = 5
     env_cfg.terrain.curriculum = False
