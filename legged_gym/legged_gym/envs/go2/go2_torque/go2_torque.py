@@ -200,10 +200,10 @@ class GO2Torque(LeggedRobot):
             self.step_count = GO2TorqueCfgPPO().runner.num_steps_per_env * self.cfg.test.checkpoint
 
         # original Gompertz: 
-        self.general_scale = np.exp(-np.exp((-self.cfg.growth.k * (self.step_count - self.cfg.growth.x0))))
+        # self.general_scale = np.exp(-np.exp((-self.cfg.growth.k * (self.step_count - self.cfg.growth.x0))))
         
         # Disabled - full scale from start:
-        # self.general_scale = 1.0
+        self.general_scale = 1.0
         
         # Linear: 
         # self.general_scale = np.clip(self.step_count / (2 * self.cfg.growth.x0), 0.0, 1.0)

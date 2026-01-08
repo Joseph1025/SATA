@@ -73,7 +73,7 @@ class GO2TorqueCfg(GO2RoughCfg):
         dynamic_friction = 1.0
         restitution = 0.
         # rough terrain only:
-        measure_heights = True
+        measure_heights = True # Set to False for plane (heights are all zeros anyway)
         measured_points_x = [-0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0., 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7,
                              0.8]  # 1mx1.6m rectangle (without center line)
         measured_points_y = [-0.5, -0.4, -0.3, -0.2, -0.1, 0., 0.1, 0.2, 0.3, 0.4, 0.5]
@@ -162,8 +162,8 @@ class GO2TorqueCfg(GO2RoughCfg):
         max_freq = 200
         start_freq = 100
 
-        k = 0.00005
-        x0 = 1000 * 12
+        k = 0.00003
+        x0 = 1000 * 24
         ema_alpha = 0.1  # EMA smoothing factor for tracking error
 
     class test:
